@@ -15,7 +15,7 @@ boss.on("error", (err) => console.error("[pg-boss]", err));
 
 await boss.start();
 
-for (const queue of Object.values(QUEUES)) {
+for (const queue of [...Object.values(QUEUES), "connector-scan"]) {
   await boss.createQueue(queue);
 }
 
@@ -26,8 +26,17 @@ await boss.work(QUEUES.provisionInstance, async ([job]) => {
 });
 
 await boss.work(QUEUES.connectorSync, async ([job]) => {
-  console.log("connector-sync received", job?.data);
-  throw new Error("connectors not implemented yet (Phase 4)");
+  const payload = job?.data as { connectorId?: string } | undefined;
+  if (!payload?.connectorId) throw new Error("connector-sync: missing connectorId");
+  const { runConnectorSync } = await import("./connector-sync");
+  await runConnectorSync(payload.connectorId);
+});
+
+await boss.work("connector-scan", async () => {
+  const { scanDueConnectors } = await import("./connector-sync");
+  await scanDueConnectors(async (connectorId) => {
+    await boss.send(QUEUES.connectorSync, { connectorId }, { singletonKey: connectorId });
+  });
 });
 
 await boss.work(QUEUES.healthPoll, async () => {
@@ -39,8 +48,10 @@ await boss.work(QUEUES.meterUsage, async () => {
   console.log("meter-usage tick");
 });
 
-// Every 5 minutes, poll tenant health (no-op until Phase 3).
+// Every 5 minutes, poll tenant health.
 await boss.schedule(QUEUES.healthPoll, "*/5 * * * *", undefined, {});
+// Every 10 minutes, enqueue due connector syncs.
+await boss.schedule("connector-scan", "*/10 * * * *", undefined, {});
 // Daily usage metering at 02:10 UTC (no-op until Phase 5).
 await boss.schedule(QUEUES.meterUsage, "10 2 * * *", undefined, {});
 

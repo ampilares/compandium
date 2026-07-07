@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@compandium/connectors": "workspace:*",
     "@compandium/db": "workspace:*",
     "@compandium/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",

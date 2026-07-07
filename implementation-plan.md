@@ -47,15 +47,19 @@ The per-tenant runtime and the pipeline that creates it.
 
 **Verification gate:** seeded department content answers a question in the Ask UI with correct citations; a member without access to that department gets a no-answer/gap response for the same question.
 
-## Phase 4 — Managed connectors ⬜
+## Phase 4 — Managed connectors 🔨 (core verified; Notion/Slack/Drive pending)
 
-Order: contract + `git` import → markdown/zip `upload` → generic `webhook` (proxies tenant `/ingest`) → `notion` → `slack` → `gdrive`.
-
-- `packages/connectors`: `Connector` contract (validate/fetch/cursor) + implementations; unit tests with recorded fixtures
-- Worker `connector-sync` handler: decrypt config → fetch(cursor) → agent `POST /v1/files` → persist cursor + run row; per-connector pg-boss cron; retries with backoff; error surfacing
-- Dashboard: connector gallery, config forms (credential fields encrypted), department binding, run history, manual "sync now"
-
-**Verification gate:** Notion (or git) connector against a real workspace: content lands in the department repo, syncs, and is queryable in Ask; second run is incremental (no dupes — "nothing to commit"); revoking the source credential surfaces a failed run without affecting queries.
+- ✅ `packages/connectors`: pull/push contract (`configSchema` + `validate` + `fetch(config, cursor)`), path-safety helpers, tests
+- ✅ **git import** (pull): shallow clone over https, markdown walk with size/count caps, head-check no-op cursor, upstream prune via seen-paths — verified against a real GitHub repo (7 files in; re-run = 0 files, unchanged)
+- ✅ **markdown upload** (push): dashboard multipart → agent files → sync — verified queryable immediately
+- ✅ **webhook** (push): per-connector tokenized public URL (`/api/hooks/:id/:token`, timing-safe), markdown or JSON `{title, path, content}` → department inbox — verified end to end
+- ✅ Worker: `connector-sync` handler (run rows, cursor persistence, error surfacing, connector status) + `connector-scan` cron every 10 min for `30m/6h/24h` schedules; manual "Sync now"
+- ✅ Dashboard: gallery + config forms, department binding, status/last-run list, remove
+- ✅ Scoping verified: connector content inherits the department ACL (member without `sales` access gets zero hits from the git-imported content)
+- ⬜ **Notion** connector (needs an integration token to verify)
+- ⬜ **Slack** connector (needs a bot token)
+- ⬜ **Google Drive** connector (needs OAuth app credentials)
+- ⬜ Run-history UI (API exists at `GET /api/connectors/:id`)
 
 ## Phase 5 — Billing + usage metering ⬜
 

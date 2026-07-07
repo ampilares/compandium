@@ -38,9 +38,12 @@ export default async function DashboardLayout({
             <Link href="/dashboard/access" className="hover:text-zinc-900 dark:hover:text-zinc-100">
               Agent access
             </Link>
-            <span title="Coming soon" className="cursor-default opacity-40">
+            <Link
+              href="/dashboard/connectors"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
               Connectors
-            </span>
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm">
