@@ -1,0 +1,22 @@
+# Local verification of the tenant image.
+#   docker compose up --build
+# Then:
+#   curl http://localhost:8080/health
+#   curl -H "Authorization: Bearer dev-agent-token-dev-agent-token-123" http://localhost:8081/v1/health
+services:
+  tenant:
+    build: .
+    ports:
+      - "8080:8080" # gbrain serve --http (public in prod)
+      - "8081:8081" # compandium-agent (private in prod — exposed here for local testing only)
+    environment:
+      AGENT_TOKEN: dev-agent-token-dev-agent-token-123
+      GBRAIN_ADMIN_BOOTSTRAP_TOKEN: dev-bootstrap-token-dev-bootstrap-1234
+      PUBLIC_URL: http://localhost:8080
+      # Optional: set to enable embeddings locally
+      # OPENAI_API_KEY: sk-...
+    volumes:
+      - tenant-data:/data
+
+volumes:
+  tenant-data:

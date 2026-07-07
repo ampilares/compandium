@@ -44,4 +44,8 @@ Checks: `bun run typecheck` · `bun run test`
 - **Connectors** run in the worker, write markdown into department repos via the agent,
   then trigger a scoped sync — markdown in git stays the portable system of record.
 
-Full plan: see the project plan file / issues.
+## Documents
+
+- [PRD.md](PRD.md) — product requirements: problem, vision, personas, MVP scope, journeys, metrics, risks
+- [specifications.md](specifications.md) — technical specs: architecture, tenant image + agent API, data model, connector contract, security
+- [implementation-plan.md](implementation-plan.md) — phased plan with verification gates and current status
