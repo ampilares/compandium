@@ -31,7 +31,8 @@ await boss.work(QUEUES.connectorSync, async ([job]) => {
 });
 
 await boss.work(QUEUES.healthPoll, async () => {
-  console.log("health-poll tick");
+  const { pollTenantHealth } = await import("./health");
+  await pollTenantHealth();
 });
 
 await boss.work(QUEUES.meterUsage, async () => {

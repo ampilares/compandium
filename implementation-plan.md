@@ -16,25 +16,21 @@ Turborepo + Bun workspaces; CI (typecheck + test on push/PR).
 
 **Verification (passed):** migrations apply cleanly; `bun run typecheck` + `bun run test` green; browser walkthrough signup → session → org creation → dashboard.
 
-## Phase 1 — Tenant image + provisioning 🔨
+## Phase 1 — Tenant image + provisioning ✅ (local; Fly pending credentials)
 
 The per-tenant runtime and the pipeline that creates it.
 
-- ✅ `packages/tenant-image/Dockerfile` — postgres:17 + pgvector + Bun + gbrain (pinned `GBRAIN_REF` build arg); **image builds successfully**
-- ✅ `supervisor.ts` — initdb/start Postgres, first-boot brain bootstrap (non-interactive init, `shared` department), supervise `gbrain serve --http` + agent with restart/backoff
-- ✅ `agent/` — private management API (departments, sync, files, members, health, export) with tests for output parsing + slug safety
-- ✅ `packages/shared/src/fly.ts` — Fly Machines REST + GraphQL IP allocation client
-- ✅ `packages/shared/src/agent-client.ts` — typed agent client for worker/web
-- ⬜ **Local boot verification** (gate below)
-- ⬜ Provisioning saga in worker (`provision-instance` handler): token generation → Fly app/volume/machine/IPs → health poll → `status=ready`; idempotent resume + compensation on failure
-- ⬜ Web: "Create your brain" onboarding (region pick → provision → live progress → ready card with MCP endpoint)
-- ⬜ Image publish workflow (GHCR or Fly registry) + `TENANT_IMAGE_REF` config
+- ✅ `packages/tenant-image/Dockerfile` — postgres:17 + pgvector + Bun + gbrain (pinned `GBRAIN_REF` build arg)
+- ✅ `supervisor.ts` — initdb/start Postgres (gbrain role needs SUPERUSER: event triggers + RLS in migrations), first-boot bootstrap (non-interactive init, federated `shared` department, `--no-embed` sync when keyless), child supervision with backoff
+- ✅ `agent/` — private management API (departments, sync, files, members, health, export); register-client scopes are space-separated; keyless syncs pass `--no-embed`
+- ✅ `packages/shared`: Fly client, typed agent client, MCP-over-HTTP client
+- ✅ **Local boot gate PASSED**: health, department create, file batch → commit → sync, member registration, OAuth token, MCP search returning seeded content, and the cross-department isolation check (zero leaks)
+- ✅ Provisioning saga (`provision-instance`): idempotent token reuse → provider.provision → health poll → `shared` mirror → ready; `TenantProvisioner` abstraction with **DockerProvisioner** (local dev, verified e2e from the dashboard) and **FlyProvisioner** (written, unverified — needs `FLY_API_TOKEN`/`FLY_ORG_SLUG`/pullable `TENANT_IMAGE`)
+- ✅ Web onboarding: BrainCard provision button → live status polling → ready card with MCP endpoint
+- ⬜ Image publish workflow (GHCR or Fly registry) — blocks Fly-live verification
+- ⬜ Fly-live gate (needs credentials from the user)
 
-**Verification gate:**
-1. `cd packages/tenant-image && docker compose up` → `GET :8080/health` 200; agent `GET :8081/v1/health` ok; `POST /v1/departments {slug:"engineering"}` → visible in `GET /v1/departments`; `POST /v1/members` returns credentials; OAuth `client_credentials` token from `:8080/token` works for an MCP `search` call.
-2. With `FLY_API_TOKEN` set: dashboard button provisions a real tenant end-to-end in < 5 min; instance row reaches `ready` with a working public MCP endpoint.
-
-## Phase 2 — Departments, members, scoped access ⬜
+## Phase 2 — Departments, members, scoped access ✅ (email invites pending SMTP)
 
 - Department CRUD (dashboard → API → agent), status + page counts on the overview
 - Member invites (Better Auth invitation flow) → automatic gbrain client provisioning; permission matrix editor (1 write dept + N read depts); change = revoke + re-register; instant revoke on removal
@@ -43,7 +39,7 @@ The per-tenant runtime and the pipeline that creates it.
 
 **Verification gate:** two members with disjoint department access; run the isolation check (scoped search from each; zero cross-department results). Removing a member 401s their agent immediately.
 
-## Phase 3 — Ask UI + health ⬜
+## Phase 3 — Ask UI + health ✅ (synthesis text needs an AI key in the tenant)
 
 - Ask page: member-scoped OAuth token → gbrain `think` over MCP → streamed answer with citations + gap notes; recent-questions list
 - Instance health card (agent `/v1/health` via 5-min worker poll), per-department last-sync + page counts, manual re-sync button
@@ -88,6 +84,10 @@ Order: contract + `git` import → markdown/zip `upload` → generic `webhook` (
 - **Secrets:** anything sensitive at rest goes through `encryptSecret()` (`packages/shared`); member client secrets are never displayed after first issue.
 - **Scope discipline:** engine gaps → upstream gbrain PRs, not forks. Slack answers bot, SSO, per-page ACLs, on-prem stay out of MVP (PRD §7).
 
-## Current status (2026-07-07)
+## Current status (2026-07-07, end of day)
 
-Phase 0 complete and verified end-to-end in the browser. Phase 1 code is written (image builds; supervisor, agent, Fly + agent clients done, all typechecked/tested); next steps are the local compose boot gate, the worker provisioning saga, and the onboarding flow.
+**The e2e MVP critical path works locally**: signup → workspace → one-click provision (Docker provider) → tenant container boots gbrain + agent → departments created from the UI → member access provisioned (scoped gbrain OAuth clients; isolation verified — zero cross-department leaks) → agent-access page with MCP snippets → Ask page answering via the member's own credentials (search fully working; think degrades gracefully keyless). Health polling records tenant liveness every 5 minutes.
+
+**Blocked on user input:** Fly-live verification (`FLY_API_TOKEN`, `FLY_ORG_SLUG`, image registry choice), bundled AI keys (`BUNDLED_ANTHROPIC_API_KEY` / `BUNDLED_OPENAI_API_KEY`) for real synthesis + embeddings, SMTP for email invites (copyable invite links work today).
+
+**Next up:** Phase 4 connectors (git import → upload → webhook → Notion → Slack → Drive), then Phase 5 billing.
