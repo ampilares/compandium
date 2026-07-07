@@ -70,7 +70,17 @@ async function createDepartment(body: Record<string, unknown>): Promise<Response
     }
   }
 
-  const added = await gbrain(["sources", "add", slug, "--path", repo, "--name", String(name)]);
+  // --federated so the department participates in members' federated reads
+  const added = await gbrain([
+    "sources",
+    "add",
+    slug,
+    "--path",
+    repo,
+    "--name",
+    String(name),
+    "--federated",
+  ]);
   if (added.code !== 0 && !/already exists/i.test(added.stderr + added.stdout)) {
     return json({ error: "sources add failed", detail: added.stderr || added.stdout }, 500);
   }
@@ -98,9 +108,25 @@ async function listDepartments(): Promise<Response> {
 
 // ---- sync + file delivery ---------------------------------------------------
 
+/** Without an embedding key, sync must import-only (embed later via backfill). */
+function hasEmbeddingProvider(): boolean {
+  return Boolean(
+    process.env.OPENAI_API_KEY ||
+      process.env.ZEROENTROPY_API_KEY ||
+      process.env.VOYAGE_API_KEY ||
+      process.env.GBRAIN_EMBEDDING_MODEL,
+  );
+}
+
+function baseSyncArgs(): string[] {
+  const args = ["sync", "--no-pull", "--yes"];
+  if (!hasEmbeddingProvider()) args.push("--no-embed");
+  return args;
+}
+
 async function syncSource(body: Record<string, unknown>): Promise<Response> {
   const source = body.source;
-  const args = ["sync", "--no-pull", "--yes"];
+  const args = baseSyncArgs();
   if (source !== undefined) {
     if (!isSafeSlug(source)) return badRequest("invalid source");
     args.push("--source", source);
@@ -156,7 +182,7 @@ async function putFiles(body: Record<string, unknown>): Promise<Response> {
   }
 
   if (body.sync !== false) {
-    const sync = await gbrain(["sync", "--source", source, "--no-pull", "--yes"], {
+    const sync = await gbrain([...baseSyncArgs(), "--source", source], {
       timeoutMs: 600_000,
     });
     if (sync.code !== 0) {
@@ -191,7 +217,7 @@ async function registerMember(body: Record<string, unknown>): Promise<Response> 
     "--grant-types",
     "client_credentials",
     "--scopes",
-    "read,write",
+    "read write",
     "--source",
     source,
     "--federated-read",

@@ -102,7 +102,12 @@ async function ensureRoleAndDb(): Promise<void> {
     run(["gosu", "postgres", "psql", "-h", "127.0.0.1", "-tAc", sql], { allowFail: true, quiet: true });
   const role = await psql("SELECT 1 FROM pg_roles WHERE rolname='gbrain'");
   if (!role.stdout.includes("1")) {
-    await psql("CREATE ROLE gbrain LOGIN PASSWORD 'gbrain'");
+    // SUPERUSER: gbrain's migrations create event triggers and enable RLS,
+    // which need superuser. This Postgres lives inside the tenant container
+    // and serves exactly this one brain, so the role owns the whole box.
+    await psql("CREATE ROLE gbrain LOGIN PASSWORD 'gbrain' SUPERUSER");
+  } else {
+    await psql("ALTER ROLE gbrain SUPERUSER");
   }
   const db = await psql("SELECT 1 FROM pg_database WHERE datname='brain'");
   if (!db.stdout.includes("1")) {
@@ -155,10 +160,15 @@ async function bootstrapBrain(): Promise<void> {
     await run(["git", "add", "-A"], { cwd: sharedRepo });
     await run(["git", "commit", "-m", "Initialize shared department"], { cwd: sharedRepo });
   }
-  await run(["gbrain", "sources", "add", "shared", "--path", sharedRepo, "--name", "Shared"], {
-    allowFail: true,
-  });
-  await run(["gbrain", "sync", "--source", "shared", "--no-pull", "--yes"], { allowFail: true });
+  // --federated: departments must participate in federated reads — that is
+  // how member OAuth clients' --federated-read scoping reaches them.
+  await run(
+    ["gbrain", "sources", "add", "shared", "--path", sharedRepo, "--name", "Shared", "--federated"],
+    { allowFail: true },
+  );
+  const syncArgs = ["gbrain", "sync", "--source", "shared", "--no-pull", "--yes"];
+  if (embeddingArgs()[0] === "--no-embedding") syncArgs.push("--no-embed");
+  await run(syncArgs, { allowFail: true });
 
   writeFileSync(BOOTSTRAP_MARKER, new Date().toISOString());
   console.log("[supervisor] bootstrap complete");
