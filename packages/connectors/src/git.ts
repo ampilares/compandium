@@ -67,12 +67,16 @@ function walkMarkdown(root: string): string[] {
   const stack = [root];
   while (stack.length > 0 && out.length < MAX_FILES) {
     const dir = stack.pop()!;
-    for (const entry of readdirSync(dir)) {
-      if (entry === ".git") continue;
-      const full = join(dir, entry);
-      const stat = statSync(full);
-      if (stat.isDirectory()) stack.push(full);
-      else if (/\.(md|markdown)$/i.test(entry) && stat.size <= MAX_FILE_BYTES) out.push(full);
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (
+        /\.(md|markdown)$/i.test(entry.name) &&
+        statSync(full).size <= MAX_FILE_BYTES
+      ) {
+        out.push(full);
+      }
     }
   }
   return out;

@@ -35,14 +35,18 @@ export class FlyProvisioner implements TenantProvisioner {
       if (!(e instanceof FlyApiError) || !/already/i.test(e.message)) throw e;
     });
 
-    const volume = await this.fly.createVolume(appName, req.region);
-    const machine = await this.fly.createMachine({
-      appName,
-      region: req.region,
-      image: this.image,
-      env: { ...req.env, PUBLIC_URL: publicUrl },
-      volumeId: volume.id,
-    });
+    const volume = await this.fly.ensureVolume(appName, req.region);
+    // idempotent retry: a machine may already exist from a partial run
+    const machines = await this.fly.listMachines(appName);
+    const machine =
+      machines[0] ??
+      (await this.fly.createMachine({
+        appName,
+        region: req.region,
+        image: this.image,
+        env: { ...req.env, PUBLIC_URL: publicUrl },
+        volumeId: volume.id,
+      }));
 
     return {
       publicUrl,

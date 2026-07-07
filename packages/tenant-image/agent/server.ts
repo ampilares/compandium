@@ -168,8 +168,8 @@ async function putFiles(body: Record<string, unknown>): Promise<Response> {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, file.content);
   }
-  for (const target of deletes) {
-    await exec(["git", "rm", "-f", "--ignore-unmatch", target], { cwd: repo });
+  if (deletes.length > 0) {
+    await exec(["git", "rm", "-f", "--ignore-unmatch", "--", ...deletes], { cwd: repo });
   }
 
   await exec(["git", "add", "-A"], { cwd: repo });

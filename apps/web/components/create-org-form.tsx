@@ -1,16 +1,9 @@
 "use client";
 
+import { slugify } from "@compandium/shared/slug";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-}
 
 export function CreateOrgForm() {
   const router = useRouter();

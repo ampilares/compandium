@@ -22,7 +22,6 @@ export type GdriveConfig = z.infer<typeof gdriveConfigSchema>;
 
 export interface GdriveCursor extends Record<string, unknown> {
   modifiedAfter?: string;
-  seenIds?: string[];
 }
 
 const FILES_API = "https://www.googleapis.com/drive/v3/files";

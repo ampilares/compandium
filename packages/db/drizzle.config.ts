@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/schema/index.ts",
   out: "./migrations",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://compandium:compandium@localhost:5432/compandium",
+    url: process.env.DATABASE_URL ?? "postgres://compandium:compandium@localhost:5544/compandium",
   },
 });

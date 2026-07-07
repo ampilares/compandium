@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: compandium
       POSTGRES_DB: compandium
     ports:
-      - "5432:5432"
+      # non-default host port: 5432/5433 are taken by other projects on dev machines
+      - "5544:5432"
     volumes:
       - compandium-pgdata:/var/lib/postgresql/data
     healthcheck:

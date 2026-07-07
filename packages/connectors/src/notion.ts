@@ -18,7 +18,6 @@ export type NotionConfig = z.infer<typeof notionConfigSchema>;
 
 export interface NotionCursor extends Record<string, unknown> {
   lastEditedAt?: string;
-  seenIds?: string[];
 }
 
 const API = "https://api.notion.com/v1";
@@ -198,7 +197,7 @@ export const notionConnector: PullConnector<NotionConfig, NotionCursor> = {
     const newest = pages[0]?.last_edited_time ?? since;
     return {
       records,
-      nextCursor: { lastEditedAt: newest, seenIds: undefined },
+      nextCursor: { lastEditedAt: newest },
       stats: { imported: records.length },
     };
   },

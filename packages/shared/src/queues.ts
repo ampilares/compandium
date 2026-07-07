@@ -1,12 +1,15 @@
-// Queue names + payload contracts shared by producers (web) and consumers (worker).
-// Keep in sync with apps/web when enqueueing.
+// Queue names + payload contracts. Single source of truth for producers
+// (apps/web) and consumers (apps/worker).
 
 export const QUEUES = {
   provisionInstance: "provision-instance",
   connectorSync: "connector-sync",
+  connectorScan: "connector-scan",
   healthPoll: "health-poll",
   meterUsage: "meter-usage",
 } as const;
+
+export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface ProvisionInstancePayload {
   instanceId: string;

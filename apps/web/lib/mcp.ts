@@ -9,7 +9,16 @@ export interface McpCredentials {
   clientSecret: string;
 }
 
+// Access tokens are valid for ~1h; cache per client with a safety margin so a
+// member's repeated Asks pay the token round trip once, not every request.
+// Keyed by clientId — revoking a member (new clientId) can't hit a stale entry.
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+const TOKEN_SAFETY_MS = 60_000;
+
 export async function getAccessToken(creds: McpCredentials): Promise<string> {
+  const cached = tokenCache.get(creds.clientId);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+
   const res = await fetch(`${creds.publicUrl}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -21,9 +30,27 @@ export async function getAccessToken(creds: McpCredentials): Promise<string> {
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`token exchange failed (${res.status})`);
-  const data = (await res.json()) as { access_token?: string };
+  const data = (await res.json()) as { access_token?: string; expires_in?: number };
   if (!data.access_token) throw new Error("token exchange returned no access_token");
+
+  const ttlMs = Math.max((data.expires_in ?? 0) * 1000 - TOKEN_SAFETY_MS, 0);
+  if (ttlMs > 0) {
+    tokenCache.set(creds.clientId, { token: data.access_token, expiresAt: Date.now() + ttlMs });
+  }
   return data.access_token;
+}
+
+function initializeBody(): string {
+  return JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "compandium-web", version: "0.1" },
+    },
+  });
 }
 
 function parseSseJson(text: string): unknown {
@@ -40,28 +67,33 @@ export async function mcpToolCall(
   args: Record<string, unknown>,
   timeoutMs = 120_000,
 ): Promise<string> {
-  const token = await getAccessToken(creds);
-  const headers = {
+  let token = await getAccessToken(creds);
+  const buildHeaders = () => ({
     authorization: `Bearer ${token}`,
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
-  };
+  });
+  let headers = buildHeaders();
 
-  const init = await fetch(`${creds.publicUrl}/mcp`, {
+  let init = await fetch(`${creds.publicUrl}/mcp`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-03-26",
-        capabilities: {},
-        clientInfo: { name: "compandium-web", version: "0.1" },
-      },
-    }),
+    body: initializeBody(),
     signal: AbortSignal.timeout(30_000),
   });
+  if (init.status === 401) {
+    // cached token no longer valid (revoked / tenant reprovisioned) — mint a
+    // fresh one and retry once
+    tokenCache.delete(creds.clientId);
+    token = await getAccessToken(creds);
+    headers = buildHeaders();
+    init = await fetch(`${creds.publicUrl}/mcp`, {
+      method: "POST",
+      headers,
+      body: initializeBody(),
+      signal: AbortSignal.timeout(30_000),
+    });
+  }
   if (!init.ok) throw new Error(`MCP initialize failed (${init.status})`);
 
   const res = await fetch(`${creds.publicUrl}/mcp`, {

@@ -1,7 +1,8 @@
 /**
  * Local-dev provisioner: one Docker container + named volume per tenant on
- * the developer's machine. Ports are published randomly (-P) and read back
- * from docker inspect. Requires the tenant image to be built locally:
+ * the developer's machine. Host ports are picked up front (bind-probe on
+ * port 0) so the container starts exactly once with its final PUBLIC_URL.
+ * Requires the tenant image to be built locally:
  *   cd packages/tenant-image && docker build -t compandium-tenant .
  */
 
@@ -24,10 +25,21 @@ function containerName(tenantName: string): string {
   return tenantName.startsWith("cpd-") ? tenantName : `cpd-${tenantName}`;
 }
 
+/** Ask the OS for a free port by binding port 0 and reading the assignment. */
+function freePort(): number {
+  const server = Bun.listen({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: { data() {} },
+  });
+  const port = server.port;
+  server.stop(true);
+  return port;
+}
+
 async function hostPort(container: string, containerPort: number): Promise<string> {
   const r = await docker(["port", container, String(containerPort)]);
   if (r.code !== 0) throw new Error(`docker port failed: ${r.stderr}`);
-  // output like "0.0.0.0:55001" (possibly multiple lines for v4/v6)
   const first = r.stdout.split("\n")[0] ?? "";
   const port = first.split(":").pop();
   if (!port) throw new Error(`could not parse docker port output: ${r.stdout}`);
@@ -41,61 +53,43 @@ export class DockerProvisioner implements TenantProvisioner {
     const name = containerName(req.tenantName);
 
     const existing = await docker(["inspect", "--format", "{{.State.Running}}", name]);
-    if (existing.code !== 0) {
-      // PUBLIC_URL needs the mapped port, which we only know after start.
-      // Start with a placeholder, read the port, then recreate with the real
-      // URL is wasteful — instead run once with -P and pass the URL after
-      // discovery via a restart with the same volume (state persists).
-      const envArgs = Object.entries({ ...req.env, PUBLIC_URL: "http://localhost:0" }).flatMap(
-        ([k, v]) => ["-e", `${k}=${v}`],
-      );
-      const run = await docker([
-        "run",
-        "-d",
-        "--name",
-        name,
-        "-v",
-        `${name}-data:/data`,
-        "-P",
-        ...envArgs,
-        IMAGE,
-      ]);
-      if (run.code !== 0) throw new Error(`docker run failed: ${run.stderr}`);
-    } else if (existing.stdout !== "true") {
-      const start = await docker(["start", name]);
-      if (start.code !== 0) throw new Error(`docker start failed: ${start.stderr}`);
+    if (existing.code === 0) {
+      // container already exists (retry): start it if stopped, reuse its ports
+      if (existing.stdout !== "true") {
+        const start = await docker(["start", name]);
+        if (start.code !== 0) throw new Error(`docker start failed: ${start.stderr}`);
+      }
+      const servePort = await hostPort(name, 8080);
+      const agentPort = await hostPort(name, 8081);
+      return {
+        publicUrl: `http://localhost:${servePort}`,
+        agentUrl: `http://localhost:${agentPort}`,
+        machineId: name,
+      };
     }
 
-    const servePort = await hostPort(name, 8080);
-    const agentPort = await hostPort(name, 8081);
+    const servePort = freePort();
+    const agentPort = freePort();
     const publicUrl = `http://localhost:${servePort}`;
-
-    // Recreate the container once with the real PUBLIC_URL if it still holds
-    // the placeholder (volume keeps all state; ports change, so re-read them).
-    const envNow = await docker(["inspect", "--format", "{{json .Config.Env}}", name]);
-    if (envNow.stdout.includes("PUBLIC_URL=http://localhost:0")) {
-      await docker(["rm", "-f", name]);
-      const envArgs = Object.entries({ ...req.env, PUBLIC_URL: publicUrl }).flatMap(([k, v]) => [
-        "-e",
-        `${k}=${v}`,
-      ]);
-      // pin the discovered ports so PUBLIC_URL stays correct across restarts
-      const run = await docker([
-        "run",
-        "-d",
-        "--name",
-        name,
-        "-v",
-        `${name}-data:/data`,
-        "-p",
-        `${servePort}:8080`,
-        "-p",
-        `${agentPort}:8081`,
-        ...envArgs,
-        IMAGE,
-      ]);
-      if (run.code !== 0) throw new Error(`docker recreate failed: ${run.stderr}`);
-    }
+    const envArgs = Object.entries({ ...req.env, PUBLIC_URL: publicUrl }).flatMap(([k, v]) => [
+      "-e",
+      `${k}=${v}`,
+    ]);
+    const run = await docker([
+      "run",
+      "-d",
+      "--name",
+      name,
+      "-v",
+      `${name}-data:/data`,
+      "-p",
+      `${servePort}:8080`,
+      "-p",
+      `${agentPort}:8081`,
+      ...envArgs,
+      IMAGE,
+    ]);
+    if (run.code !== 0) throw new Error(`docker run failed: ${run.stderr}`);
 
     return {
       publicUrl,

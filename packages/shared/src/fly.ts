@@ -87,7 +87,16 @@ export class FlyClient {
     }
   }
 
-  async createVolume(appName: string, region: string, sizeGb = 10): Promise<{ id: string }> {
+  async listVolumes(appName: string): Promise<Array<{ id: string; name: string; region: string }>> {
+    return this.rest("GET", `/apps/${appName}/volumes`);
+  }
+
+  /** Idempotent: a provisioning retry reuses the existing data volume. */
+  async ensureVolume(appName: string, region: string, sizeGb = 10): Promise<{ id: string }> {
+    const existing = (await this.listVolumes(appName)).find(
+      (v) => v.name === "data" && v.region === region,
+    );
+    if (existing) return existing;
     return this.rest("POST", `/apps/${appName}/volumes`, {
       name: "data",
       region,
@@ -135,6 +144,10 @@ export class FlyClient {
 
   async getMachine(appName: string, machineId: string): Promise<{ id: string; state: string }> {
     return this.rest("GET", `/apps/${appName}/machines/${machineId}`);
+  }
+
+  async listMachines(appName: string): Promise<Array<{ id: string; state: string }>> {
+    return this.rest("GET", `/apps/${appName}/machines`);
   }
 
   /** Allocate shared IPv4 + dedicated IPv6 so <app>.fly.dev routes publicly. */

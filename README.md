@@ -49,3 +49,4 @@ Checks: `bun run typecheck` · `bun run test`
 - [PRD.md](PRD.md) — product requirements: problem, vision, personas, MVP scope, journeys, metrics, risks
 - [specifications.md](specifications.md) — technical specs: architecture, tenant image + agent API, data model, connector contract, security
 - [implementation-plan.md](implementation-plan.md) — phased plan with verification gates and current status
+- [docs/coding-guide.md](docs/coding-guide.md) — invariants, conventions, and the verification bar for anyone (or any model) writing code here

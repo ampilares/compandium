@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold capitalize">{ctx.orgSlug.replace(/-/g, " ")}</h1>
+        <h1 className="text-2xl font-semibold">{ctx.orgName}</h1>
         <p className="text-sm text-zinc-500">workspace: {ctx.orgSlug}</p>
       </div>
       <BrainCard

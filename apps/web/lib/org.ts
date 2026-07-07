@@ -7,6 +7,7 @@ export interface OrgContext {
   userId: string;
   orgId: string;
   orgSlug: string;
+  orgName: string;
   memberId: string;
   role: string;
 }
@@ -22,6 +23,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       role: schema.member.role,
       orgId: schema.organization.id,
       orgSlug: schema.organization.slug,
+      orgName: schema.organization.name,
     })
     .from(schema.member)
     .innerJoin(schema.organization, eq(schema.member.organizationId, schema.organization.id))

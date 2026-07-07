@@ -1,6 +1,7 @@
 import { PULL_CONNECTORS, PUSH_CONNECTORS } from "@compandium/connectors";
 import { getDb, schema } from "@compandium/db";
 import { encryptSecret, generateToken } from "@compandium/shared";
+import { QUEUES } from "@compandium/shared/queues";
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getOrgContext, isAdmin } from "@/lib/org";
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
   // pull connectors: kick off the first sync right away
   if (PULL_CONNECTORS[type]) {
     const queue = await getQueue();
-    await queue.send("connector-sync", { connectorId }, { retryLimit: 2, retryDelay: 60 });
+    await queue.send(QUEUES.connectorSync, { connectorId }, { retryLimit: 2, retryDelay: 60 });
   }
 
   await db.insert(schema.auditLog).values({

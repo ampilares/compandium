@@ -1,4 +1,5 @@
 import { getDb, schema } from "@compandium/db";
+import { QUEUES } from "@compandium/shared/queues";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getInstance, getOrgContext, isAdmin } from "@/lib/org";
@@ -58,7 +59,7 @@ export async function POST() {
 
   const queue = await getQueue();
   await queue.send(
-    "provision-instance",
+    QUEUES.provisionInstance,
     { instanceId, organizationId: ctx.orgId },
     { retryLimit: 3, retryDelay: 30, expireInSeconds: 900 },
   );

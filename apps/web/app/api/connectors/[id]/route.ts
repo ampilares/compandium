@@ -1,4 +1,5 @@
 import { getDb, schema } from "@compandium/db";
+import { QUEUES } from "@compandium/shared/queues";
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getOrgContext, isAdmin } from "@/lib/org";
@@ -44,7 +45,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const connector = await findConnector(ctx.orgId, id);
   if (!connector) return NextResponse.json({ error: "not found" }, { status: 404 });
   const queue = await getQueue();
-  await queue.send("connector-sync", { connectorId: id }, { singletonKey: id });
+  await queue.send(QUEUES.connectorSync, { connectorId: id }, { singletonKey: id });
   return NextResponse.json({ ok: true }, { status: 202 });
 }
 

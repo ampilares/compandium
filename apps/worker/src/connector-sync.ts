@@ -59,10 +59,6 @@ export async function runConnectorSync(connectorId: string): Promise<void> {
       });
       written += batch.length;
     }
-    if (result.records.length === 0) {
-      // nothing new — no commit, no sync
-    }
-
     await db
       .update(schema.connectors)
       .set({
@@ -98,7 +94,7 @@ export async function runConnectorSync(connectorId: string): Promise<void> {
 }
 
 /** Interval shorthand: "15m", "1h", "24h". */
-function intervalMs(schedule: string): number | null {
+export function intervalMs(schedule: string): number | null {
   const m = schedule.match(/^(\d+)(m|h)$/);
   if (!m) return null;
   return Number(m[1]) * (m[2] === "h" ? 3_600_000 : 60_000);
