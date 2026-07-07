@@ -1,0 +1,21 @@
+# Local dev dependencies for the control plane.
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: compandium
+      POSTGRES_PASSWORD: compandium
+      POSTGRES_DB: compandium
+    ports:
+      - "5432:5432"
+    volumes:
+      - compandium-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compandium"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  compandium-pgdata:

@@ -1,0 +1,26 @@
+# reference material (vendored external repos, not part of the product)
+references/
+
+# deps
+node_modules/
+.bun/
+
+# builds
+.next/
+dist/
+out/
+.turbo/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# db
+*.sqlite
+pgdata/
+
+# misc
+.DS_Store
+*.log
+coverage/

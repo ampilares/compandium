@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--filter", "@compandium/web", "dev"],
+      "port": 3100,
+      "autoPort": false
+    }
+  ]
+}
