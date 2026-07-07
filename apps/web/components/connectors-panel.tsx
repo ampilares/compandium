@@ -19,14 +19,69 @@ export interface DeptOption {
   name: string;
 }
 
-const TYPES = [
-  { type: "git", title: "Git repository", blurb: "Import every markdown file from any https git repo (wikis, Obsidian vaults, docs folders). Re-syncs on a schedule." },
-  { type: "upload", title: "Markdown upload", blurb: "Drop .md files straight into a department from your browser." },
-  { type: "webhook", title: "Webhook", blurb: "A URL for Zapier, IFTTT, or Apple Shortcuts to push notes into a department." },
-  { type: "notion", title: "Notion", blurb: "Coming soon", soon: true },
-  { type: "slack", title: "Slack", blurb: "Coming soon", soon: true },
-  { type: "gdrive", title: "Google Drive", blurb: "Coming soon", soon: true },
-] as const;
+interface ConfigField {
+  key: string;
+  label: string;
+  placeholder: string;
+  secret?: boolean;
+}
+
+const TYPES: Array<{
+  type: string;
+  title: string;
+  blurb: string;
+  fields?: ConfigField[];
+  defaultSchedule?: string;
+}> = [
+  {
+    type: "git",
+    title: "Git repository",
+    blurb: "Import every markdown file from any https git repo (wikis, Obsidian vaults, docs folders). Re-syncs on a schedule.",
+    fields: [{ key: "repoUrl", label: "Repository URL", placeholder: "https://github.com/org/repo" }],
+    defaultSchedule: "6h",
+  },
+  {
+    type: "upload",
+    title: "Markdown upload",
+    blurb: "Drop .md files straight into a department from your browser.",
+  },
+  {
+    type: "webhook",
+    title: "Webhook",
+    blurb: "A URL for Zapier, IFTTT, or Apple Shortcuts to push notes into a department.",
+  },
+  {
+    type: "notion",
+    title: "Notion",
+    blurb: "Import every page shared with your Notion integration.",
+    fields: [
+      { key: "integrationToken", label: "Integration token", placeholder: "ntn_… or secret_…", secret: true },
+    ],
+    defaultSchedule: "6h",
+  },
+  {
+    type: "slack",
+    title: "Slack",
+    blurb: "Archive a channel into daily digests (bot token with channels:history).",
+    fields: [
+      { key: "botToken", label: "Bot token", placeholder: "xoxb-…", secret: true },
+      { key: "channelId", label: "Channel ID", placeholder: "C0123456789" },
+    ],
+    defaultSchedule: "30m",
+  },
+  {
+    type: "gdrive",
+    title: "Google Drive",
+    blurb: "Import Google Docs and markdown files from a folder (OAuth refresh token).",
+    fields: [
+      { key: "clientId", label: "OAuth client ID", placeholder: "….apps.googleusercontent.com" },
+      { key: "clientSecret", label: "OAuth client secret", placeholder: "GOCSPX-…", secret: true },
+      { key: "refreshToken", label: "Refresh token", placeholder: "1//…", secret: true },
+      { key: "folderId", label: "Folder ID", placeholder: "from the folder URL" },
+    ],
+    defaultSchedule: "6h",
+  },
+];
 
 export function ConnectorsPanel({
   connectors,
@@ -113,29 +168,30 @@ export function ConnectorsPanel({
       {canManage && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TYPES.map((t) => (
-            <div
-              key={t.type}
-              className={`rounded-xl border border-zinc-200 p-5 dark:border-zinc-800 ${"soon" in t && t.soon ? "opacity-50" : ""}`}
-            >
+            <div key={t.type} className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
               <h3 className="font-medium">{t.title}</h3>
               <p className="mb-3 mt-1 text-sm text-zinc-500">{t.blurb}</p>
-              {!("soon" in t && t.soon) && (
-                <button
-                  onClick={() => setOpenForm(openForm === t.type ? null : t.type)}
-                  className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                >
-                  {openForm === t.type ? "Close" : "Add"}
-                </button>
-              )}
+              <button
+                onClick={() => setOpenForm(openForm === t.type ? null : t.type)}
+                className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                {openForm === t.type ? "Close" : "Add"}
+              </button>
               {openForm === t.type && (
                 <div className="mt-4">
-                  {t.type === "git" && (
-                    <GitForm departments={departments} onDone={() => { setOpenForm(null); router.refresh(); }} setError={setError} setNotice={setNotice} />
-                  )}
-                  {t.type === "upload" && (
+                  {t.fields ? (
+                    <PullForm
+                      type={t.type}
+                      fields={t.fields}
+                      defaultSchedule={t.defaultSchedule ?? "6h"}
+                      departments={departments}
+                      onDone={() => { setOpenForm(null); router.refresh(); }}
+                      setError={setError}
+                      setNotice={setNotice}
+                    />
+                  ) : t.type === "upload" ? (
                     <UploadForm departments={departments} onDone={() => { setOpenForm(null); router.refresh(); }} setError={setError} setNotice={setNotice} />
-                  )}
-                  {t.type === "webhook" && (
+                  ) : (
                     <WebhookForm departments={departments} onDone={() => router.refresh()} setError={setError} />
                   )}
                 </div>
@@ -172,19 +228,26 @@ function DeptSelect({
   );
 }
 
-function GitForm({
+function PullForm({
+  type,
+  fields,
+  defaultSchedule,
   departments,
   onDone,
   setError,
   setNotice,
 }: {
+  type: string;
+  fields: ConfigField[];
+  defaultSchedule: string;
   departments: DeptOption[];
   onDone: () => void;
   setError: (v: string | null) => void;
   setNotice: (v: string | null) => void;
 }) {
-  const [repoUrl, setRepoUrl] = useState("");
-  const [schedule, setSchedule] = useState("6h");
+  const [name, setName] = useState("");
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [schedule, setSchedule] = useState(defaultSchedule);
   const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -192,15 +255,16 @@ function GitForm({
     e.preventDefault();
     setError(null);
     setBusy(true);
+    const fallbackName = config[fields[0]?.key ?? ""]?.replace(/^https:\/\//, "").slice(0, 60);
     const res = await fetch("/api/connectors", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "git",
-        name: repoUrl.replace(/^https:\/\//, "").slice(0, 60),
+        type,
+        name: name.trim() || fallbackName || type,
         departmentId,
         schedule,
-        config: { repoUrl },
+        config,
       }),
     });
     setBusy(false);
@@ -209,19 +273,29 @@ function GitForm({
       setError(body?.error ?? `failed (${res.status})`);
       return;
     }
-    setNotice("Git connector added — first import queued.");
+    setNotice(`${type} connector added — first sync queued.`);
     onDone();
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
       <input
-        required
-        placeholder="https://github.com/org/repo"
-        value={repoUrl}
-        onChange={(e) => setRepoUrl(e.target.value)}
+        placeholder="Name (optional)"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         className="rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
       />
+      {fields.map((f) => (
+        <input
+          key={f.key}
+          required
+          type={f.secret ? "password" : "text"}
+          placeholder={`${f.label} — ${f.placeholder}`}
+          value={config[f.key] ?? ""}
+          onChange={(e) => setConfig((c) => ({ ...c, [f.key]: e.target.value }))}
+          className="rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+        />
+      ))}
       <div className="flex gap-2">
         <DeptSelect departments={departments} value={departmentId} onChange={setDepartmentId} />
         <select
@@ -239,7 +313,7 @@ function GitForm({
         disabled={busy}
         className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
       >
-        {busy ? "Validating…" : "Connect repository"}
+        {busy ? "Validating…" : "Connect"}
       </button>
     </form>
   );
