@@ -23,6 +23,10 @@ export const instances = pgTable("instances", {
   })
     .notNull()
     .default("queued"),
+  // which backend runs the tenant: fly (prod) or docker (local dev)
+  provider: text("provider", { enum: ["fly", "docker"] }).notNull().default("fly"),
+  // private URL of the compandium-agent sidecar (Fly private net / localhost)
+  agentUrl: text("agent_url"),
   flyAppName: text("fly_app_name").unique(),
   region: text("region").notNull().default("iad"),
   machineId: text("machine_id"),

@@ -1,4 +1,6 @@
 import PgBoss from "pg-boss";
+import { provisionInstance } from "./provision";
+import type { ProvisionInstancePayload } from "./queues";
 import { QUEUES } from "./queues";
 
 const connectionString = process.env.DATABASE_URL;
@@ -17,10 +19,10 @@ for (const queue of Object.values(QUEUES)) {
   await boss.createQueue(queue);
 }
 
-// Handlers are stubs in Phase 0; each later phase fills one in.
 await boss.work(QUEUES.provisionInstance, async ([job]) => {
-  console.log("provision-instance received", job?.data);
-  throw new Error("provisioning not implemented yet (Phase 1)");
+  const payload = job?.data as ProvisionInstancePayload | undefined;
+  if (!payload?.instanceId) throw new Error("provision-instance: missing instanceId");
+  await provisionInstance(payload.instanceId);
 });
 
 await boss.work(QUEUES.connectorSync, async ([job]) => {

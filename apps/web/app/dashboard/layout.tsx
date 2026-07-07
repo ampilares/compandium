@@ -23,17 +23,23 @@ export default async function DashboardLayout({
             <Link href="/dashboard" className="hover:text-zinc-900 dark:hover:text-zinc-100">
               Overview
             </Link>
-            <span title="Coming soon" className="cursor-default opacity-40">
+            <Link
+              href="/dashboard/departments"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
               Departments
-            </span>
-            <span title="Coming soon" className="cursor-default opacity-40">
+            </Link>
+            <Link href="/dashboard/members" className="hover:text-zinc-900 dark:hover:text-zinc-100">
               Members
-            </span>
+            </Link>
+            <Link href="/dashboard/ask" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Ask
+            </Link>
+            <Link href="/dashboard/access" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Agent access
+            </Link>
             <span title="Coming soon" className="cursor-default opacity-40">
               Connectors
-            </span>
-            <span title="Coming soon" className="cursor-default opacity-40">
-              Ask
             </span>
           </nav>
         </div>
