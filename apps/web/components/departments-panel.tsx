@@ -79,6 +79,13 @@ export function DepartmentsPanel({
             </div>
             {canManage && (
               <div className="flex gap-2">
+                <a
+                  href={`/api/departments/${d.id}/export`}
+                  className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  title="Download this department as a portable git bundle"
+                >
+                  Export
+                </a>
                 <button
                   onClick={() => act(d.id, "POST", `/api/departments/${d.id}/sync`)}
                   disabled={pending === d.id}

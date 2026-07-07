@@ -120,47 +120,7 @@ export function ConnectorsPanel({
       {connectors.length > 0 && (
         <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {connectors.map((c) => (
-            <li key={c.id} className="flex items-center justify-between gap-4 px-5 py-4">
-              <div>
-                <p className="font-medium">
-                  {c.name}{" "}
-                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-500 dark:bg-zinc-800">
-                    {c.type}
-                  </span>
-                </p>
-                <p className="text-sm text-zinc-500">
-                  → {c.departmentSlug}
-                  {c.schedule ? ` · every ${c.schedule}` : ""} ·{" "}
-                  {c.status === "error" ? (
-                    <span className="text-red-600">last run failed</span>
-                  ) : c.lastRunAt ? (
-                    `last run ${new Date(c.lastRunAt).toLocaleString()}`
-                  ) : (
-                    "never run"
-                  )}
-                </p>
-              </div>
-              {canManage && (
-                <div className="flex gap-2">
-                  {c.type !== "upload" && c.type !== "webhook" && (
-                    <button
-                      onClick={() => act(c.id, "POST")}
-                      disabled={busy === c.id}
-                      className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    >
-                      Sync now
-                    </button>
-                  )}
-                  <button
-                    onClick={() => confirm(`Remove connector "${c.name}"?`) && act(c.id, "DELETE")}
-                    disabled={busy === c.id}
-                    className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </li>
+            <ConnectorRow key={c.id} connector={c} canManage={canManage} busy={busy} act={act} />
           ))}
         </ul>
       )}
@@ -201,6 +161,105 @@ export function ConnectorsPanel({
         </div>
       )}
     </div>
+  );
+}
+
+interface RunView {
+  id: string;
+  status: string;
+  stats: Record<string, unknown> | null;
+  error: string | null;
+  startedAt: string;
+}
+
+function ConnectorRow({
+  connector: c,
+  canManage,
+  busy,
+  act,
+}: {
+  connector: ConnectorView;
+  canManage: boolean;
+  busy: string | null;
+  act: (id: string, method: "POST" | "DELETE") => Promise<void>;
+}) {
+  const [runs, setRuns] = useState<RunView[] | null>(null);
+  const [open, setOpen] = useState(false);
+
+  async function toggleHistory() {
+    if (!open && runs === null) {
+      const res = await fetch(`/api/connectors/${c.id}`);
+      if (res.ok) {
+        const body = (await res.json()) as { runs: RunView[] };
+        setRuns(body.runs);
+      }
+    }
+    setOpen((v) => !v);
+  }
+
+  return (
+    <li className="px-5 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-medium">
+            {c.name}{" "}
+            <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-500 dark:bg-zinc-800">
+              {c.type}
+            </span>
+          </p>
+          <p className="text-sm text-zinc-500">
+            → {c.departmentSlug}
+            {c.schedule ? ` · every ${c.schedule}` : ""} ·{" "}
+            {c.status === "error" ? (
+              <span className="text-red-600">last run failed</span>
+            ) : c.lastRunAt ? (
+              `last run ${new Date(c.lastRunAt).toLocaleString()}`
+            ) : (
+              "never run"
+            )}{" "}
+            ·{" "}
+            <button className="underline" onClick={toggleHistory}>
+              {open ? "hide history" : "history"}
+            </button>
+          </p>
+        </div>
+        {canManage && (
+          <div className="flex gap-2">
+            {c.type !== "upload" && c.type !== "webhook" && (
+              <button
+                onClick={() => act(c.id, "POST")}
+                disabled={busy === c.id}
+                className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Sync now
+              </button>
+            )}
+            <button
+              onClick={() => confirm(`Remove connector "${c.name}"?`) && act(c.id, "DELETE")}
+              disabled={busy === c.id}
+              className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+      </div>
+      {open && (
+        <ul className="mt-3 flex flex-col gap-1 rounded-lg bg-zinc-50 p-3 text-xs dark:bg-zinc-900">
+          {(runs ?? []).length === 0 && <li className="text-zinc-500">No runs yet.</li>}
+          {(runs ?? []).map((r) => (
+            <li key={r.id} className="flex items-baseline justify-between gap-3">
+              <span className={r.status === "error" ? "text-red-600" : "text-zinc-600 dark:text-zinc-400"}>
+                {r.status}
+                {r.stats ? ` — ${Object.entries(r.stats).map(([k, v]) => `${k}: ${v}`).join(", ")}` : ""}
+                {r.error ? ` — ${r.error.slice(0, 120)}` : ""}
+              </span>
+              <time className="shrink-0 text-zinc-400">{new Date(r.startedAt).toLocaleString()}</time>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 

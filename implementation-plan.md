@@ -47,7 +47,7 @@ The per-tenant runtime and the pipeline that creates it.
 
 **Verification gate:** seeded department content answers a question in the Ask UI with correct citations; a member without access to that department gets a no-answer/gap response for the same question.
 
-## Phase 4 — Managed connectors 🔨 (core verified; Notion/Slack/Drive pending)
+## Phase 4 — Managed connectors ✅ (Notion/Slack/Drive fixture-tested, live-unverified)
 
 - ✅ `packages/connectors`: pull/push contract (`configSchema` + `validate` + `fetch(config, cursor)`), path-safety helpers, tests
 - ✅ **git import** (pull): shallow clone over https, markdown walk with size/count caps, head-check no-op cursor, upstream prune via seen-paths — verified against a real GitHub repo (7 files in; re-run = 0 files, unchanged)
@@ -56,10 +56,8 @@ The per-tenant runtime and the pipeline that creates it.
 - ✅ Worker: `connector-sync` handler (run rows, cursor persistence, error surfacing, connector status) + `connector-scan` cron every 10 min for `30m/6h/24h` schedules; manual "Sync now"
 - ✅ Dashboard: gallery + config forms, department binding, status/last-run list, remove
 - ✅ Scoping verified: connector content inherits the department ACL (member without `sales` access gets zero hits from the git-imported content)
-- ⬜ **Notion** connector (needs an integration token to verify)
-- ⬜ **Slack** connector (needs a bot token)
-- ⬜ **Google Drive** connector (needs OAuth app credentials)
-- ⬜ Run-history UI (API exists at `GET /api/connectors/:id`)
+- ✅ **Notion / Slack / Google Drive** connectors implemented against the documented APIs with an injectable HTTP transport and fixture unit tests (17 tests green). **Live verification still requires real tokens** — first user with a token exercises each one.
+- ✅ Run-history UI (expandable per connector)
 
 ## Phase 5 — Billing + usage metering ⬜
 
@@ -70,12 +68,14 @@ The per-tenant runtime and the pipeline that creates it.
 
 **Verification gate:** test-mode checkout upgrades a workspace and lifts caps; canceling downgrades; usage records appear after the metering job; BYO key swap verified by a successful embed/think after restart.
 
-## Phase 6 — Launch polish ⬜
+## Phase 6 — Launch polish 🔨
 
-- Marketing site (what-it-looks-like demo, connector gallery, pricing) — Vitrus-style, with prominent gbrain credit
-- Export-my-brain: per-department git bundles from the dashboard (agent `/v1/export`)
-- Audit log UI, docs (setup guides per MCP client), support email, status page
-- Tenant-image release pipeline: build (pinned `GBRAIN_REF`) → CI + isolation suite → staging soak → fleet rollout
+- ✅ Marketing landing page (demo block, feature grid, how-it-works, gbrain credit) — verified rendering
+- ✅ Export-my-brain: per-department git-bundle download from the Departments page — verified (streams a real bundle)
+- ✅ Activity (audit log) page — verified
+- ⬜ Pricing section (depends on Phase 5 billing)
+- ⬜ Docs (per-MCP-client setup guides), support email, status page
+- ⬜ Tenant-image release pipeline (build pinned `GBRAIN_REF` → CI + isolation suite → staging soak → fleet rollout)
 
 **Verification gate:** a cold signup (someone not on the team) reaches a cited answer without help in under an hour — the PRD activation metric.
 
@@ -94,4 +94,4 @@ The per-tenant runtime and the pipeline that creates it.
 
 **Blocked on user input:** Fly-live verification (`FLY_API_TOKEN`, `FLY_ORG_SLUG`, image registry choice), bundled AI keys (`BUNDLED_ANTHROPIC_API_KEY` / `BUNDLED_OPENAI_API_KEY`) for real synthesis + embeddings, SMTP for email invites (copyable invite links work today).
 
-**Next up:** Phase 4 connectors (git import → upload → webhook → Notion → Slack → Drive), then Phase 5 billing.
+**Next up:** Phase 5 billing (needs Stripe test keys), remaining Phase 6 items (docs, release pipeline), live verification of Notion/Slack/Drive connectors (needs tokens), Fly production deploy (needs credentials).
