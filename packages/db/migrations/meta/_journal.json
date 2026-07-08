@@ -15,6 +15,13 @@
       "when": 1783390142065,
       "tag": "0001_loud_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783527040333,
+      "tag": "0002_robust_captain_britain",
+      "breakpoints": true
     }
   ]
 }
